@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 
+
 // Mock stock data (replace with real API in production)
 const mockStocks = [
   { symbol: 'AAPL', name: 'Apple Inc.', price: 178.72, change: +1.23 },
@@ -25,22 +26,76 @@ export default function App() {
     stock.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Simulates updating stock prices
-  useEffect(() => {
+// Separate effect for page tracking
+
+
+useEffect(() => {
+  // Check if analytics is available
+  if (window.analytics) {
     if (isLoggedIn) {
-      const interval = setInterval(() => {
-        setStocks(prevStocks => 
-          prevStocks.map(stock => ({
-            ...stock,
-            price: parseFloat((stock.price + (Math.random() - 0.5) * 0.5).toFixed(2)),
-            change: parseFloat((Math.random() - 0.5) * 2).toFixed(2)
-          }))
-        );
-      }, 5000);
-      
-      return () => clearInterval(interval);
+      // Track dashboard page view
+      window.analytics.page('Dashboard');
+    } else if (activeView === 'login') {
+      // Track login page view
+      window.analytics.page('Login');
+    } else if (activeView === 'signup') {
+      // Track signup page view
+      window.analytics.page('Signup');
     }
-  }, [isLoggedIn]);
+  }
+}, [isLoggedIn, activeView]); // Include both in dependency array
+
+// Separate effect for price updates
+useEffect(() => {
+  if (isLoggedIn) {
+    const interval = setInterval(() => {
+      setStocks(prevStocks => 
+        prevStocks.map(stock => ({
+          ...stock,
+          price: parseFloat((stock.price + (Math.random() - 0.5) * 0.5).toFixed(2)),
+          change: parseFloat((Math.random() - 0.5) * 2).toFixed(2)
+        }))
+      );
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }
+}, [isLoggedIn]);
+
+// Check if analytics loaded
+useEffect(() => {
+  const checkAnalytics = setInterval(() => {
+    if (window.analytics) {
+      console.log("Segment analytics loaded successfully");
+      clearInterval(checkAnalytics);
+    }
+  }, 1000);
+  
+  return () => clearInterval(checkAnalytics);
+}, []);
+
+useEffect(() => {
+  // Only inject if not already present
+  if (!window.analytics) {
+    console.log("Manually injecting Segment analytics.js");
+    const script = document.createElement('script');
+    script.src = `https://cdn.segment.com/analytics.js/v1/55Z9sqloE39IO31tUpEbJMuiYpX6hmvA/analytics.min.js`;
+    script.async = true;
+    script.onload = () => {
+      console.log("Segment script loaded successfully");
+      if (window.analytics) {
+        window.analytics.page();
+        console.log("Page event tracked");
+      }
+    };
+    script.onerror = (err) => {
+      console.error("Error loading Segment script:", err);
+    };
+    document.head.appendChild(script);
+  }
+}, []);
+
+
 
   // Handle login logic
   const handleLogin = (username, password) => {
@@ -49,6 +104,16 @@ export default function App() {
       setUser({ username });
       setIsLoggedIn(true);
       setActiveView('dashboard');
+    // Track login event if analytics exists
+    if (window.analytics) {
+      window.analytics.identify(username, {
+        username: username
+      });
+    
+      window.analytics.track('User Logged In', {
+        method: 'username/password'
+      });
+      }
     }
   };
 
@@ -270,6 +335,18 @@ function SignupForm({ onSignup, onSwitchToLogin }) {
 
 // Dashboard Component
 function Dashboard({ stocks, searchTerm, setSearchTerm }) {
+  // Add this handler function
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    
+    // Track search if value exists and analytics is available
+    if (value && window.analytics) {
+      window.analytics.track('Stock Search', {
+        searchTerm: value
+      });
+    }
+  };
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-6">
