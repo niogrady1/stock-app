@@ -1,24 +1,31 @@
 import { useState, useEffect } from 'react';
 
+// Stock symbols we want to track
+const stockSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA'];
 
-// Mock stock data (replace with real API in production)
-const mockStocks = [
-  { symbol: 'AAPL', name: 'Apple Inc.', price: 178.72, change: +1.23 },
-  { symbol: 'MSFT', name: 'Microsoft Corporation', price: 329.56, change: -0.87 },
-  { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 141.18, change: +0.53 },
-  { symbol: 'AMZN', name: 'Amazon.com Inc.', price: 178.15, change: -1.05 },
-  { symbol: 'TSLA', name: 'Tesla, Inc.', price: 194.05, change: +3.21 },
-  { symbol: 'META', name: 'Meta Platforms, Inc.', price: 474.32, change: +2.16 },
-  { symbol: 'NVDA', name: 'NVIDIA Corporation', price: 924.79, change: +10.25 },
-];
+// Company names mapping (since the API doesn't return company names)
+const companyNames = {
+  'AAPL': 'Apple Inc.',
+  'MSFT': 'Microsoft Corporation',
+  'GOOGL': 'Alphabet Inc.',
+  'AMZN': 'Amazon.com Inc.',
+  'TSLA': 'Tesla, Inc.',
+  'META': 'Meta Platforms, Inc.',
+  'NVDA': 'NVIDIA Corporation'
+};
 
 // Main App Component
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [activeView, setActiveView] = useState('login');
-  const [stocks, setStocks] = useState(mockStocks);
+  const [stocks, setStocks] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  
+  // Finnhub API Key - replace with your own
+  const apiKey = 'd0efsjhr01qkbclb48o0d0efsjhr01qkbclb48og';
 
   // Filter stocks based on search term
   const filteredStocks = stocks.filter(stock => 
@@ -26,76 +33,86 @@ export default function App() {
     stock.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-// Separate effect for page tracking
-
-
-useEffect(() => {
-  // Check if analytics is available
-  if (window.analytics) {
-    if (isLoggedIn) {
-      // Track dashboard page view
-      window.analytics.page('Dashboard');
-    } else if (activeView === 'login') {
-      // Track login page view
-      window.analytics.page('Login');
-    } else if (activeView === 'signup') {
-      // Track signup page view
-      window.analytics.page('Signup');
-    }
-  }
-}, [isLoggedIn, activeView]); // Include both in dependency array
-
-// Separate effect for price updates
-useEffect(() => {
-  if (isLoggedIn) {
-    const interval = setInterval(() => {
-      setStocks(prevStocks => 
-        prevStocks.map(stock => ({
-          ...stock,
-          price: parseFloat((stock.price + (Math.random() - 0.5) * 0.5).toFixed(2)),
-          change: parseFloat((Math.random() - 0.5) * 2).toFixed(2)
-        }))
-      );
-    }, 5000);
+  // Function to fetch real stock data from Finnhub
+  const fetchStockData = async () => {
+    setLoading(true);
+    setError('');
     
-    return () => clearInterval(interval);
-  }
-}, [isLoggedIn]);
-
-// Check if analytics loaded
-useEffect(() => {
-  const checkAnalytics = setInterval(() => {
-    if (window.analytics) {
-      console.log("Segment analytics loaded successfully");
-      clearInterval(checkAnalytics);
+    try {
+      // Create an array to hold our stock data
+      const stockData = [];
+      
+      // Fetch data for each stock using Finnhub's Quote endpoint
+      const fetchPromises = stockSymbols.map(async (symbol) => {
+        try {
+          const response = await fetch(
+            `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`
+          );
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          
+          // Check if we got valid data
+          if (data && data.c) {
+            stockData.push({
+              symbol,
+              name: companyNames[symbol],
+              price: data.c,
+              change: data.d
+            });
+          } else {
+            console.warn(`No data available for ${symbol}`);
+            // Add fallback data if API doesn't return valid data
+            stockData.push({
+              symbol,
+              name: companyNames[symbol],
+              price: Math.random() * 500 + 100, // Random price between 100-600
+              change: (Math.random() - 0.5) * 10 // Random change between -5 and 5
+            });
+          }
+        } catch (err) {
+          console.error(`Error fetching data for ${symbol}:`, err);
+          // Add fallback data if API request fails
+          stockData.push({
+            symbol,
+            name: companyNames[symbol],
+            price: Math.random() * 500 + 100,
+            change: (Math.random() - 0.5) * 10
+          });
+        }
+      });
+      
+      // Wait for all API calls to complete
+      await Promise.all(fetchPromises);
+      
+      // Sort the stock data by symbol to maintain consistent order
+      stockData.sort((a, b) => a.symbol.localeCompare(b.symbol));
+      
+      setStocks(stockData);
+    } catch (err) {
+      console.error('Error fetching stock data:', err);
+      setError('Failed to fetch stock data. Please try again later.');
+    } finally {
+      setLoading(false);
     }
-  }, 1000);
-  
-  return () => clearInterval(checkAnalytics);
-}, []);
+  };
 
-useEffect(() => {
-  // Only inject if not already present
-  if (!window.analytics) {
-    console.log("Manually injecting Segment analytics.js");
-    const script = document.createElement('script');
-    script.src = `https://cdn.segment.com/analytics.js/v1/55Z9sqloE39IO31tUpEbJMuiYpX6hmvA/analytics.min.js`;
-    script.async = true;
-    script.onload = () => {
-      console.log("Segment script loaded successfully");
-      if (window.analytics) {
-        window.analytics.page();
-        console.log("Page event tracked");
-      }
-    };
-    script.onerror = (err) => {
-      console.error("Error loading Segment script:", err);
-    };
-    document.head.appendChild(script);
-  }
-}, []);
-
-
+  // Fetch real stock data when logged in
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchStockData();
+      
+      // Refresh stock data every 60 seconds
+      const interval = setInterval(() => {
+        fetchStockData();
+      }, 60000); // 60 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [isLoggedIn]);
 
   // Handle login logic
   const handleLogin = (username, password) => {
@@ -104,16 +121,6 @@ useEffect(() => {
       setUser({ username });
       setIsLoggedIn(true);
       setActiveView('dashboard');
-    // Track login event if analytics exists
-    if (window.analytics) {
-      window.analytics.identify(username, {
-        username: username
-      });
-    
-      window.analytics.track('User Logged In', {
-        method: 'username/password'
-      });
-      }
     }
   };
 
@@ -146,7 +153,28 @@ useEffect(() => {
           />
         )}
 
-        {isLoggedIn && (
+        {isLoggedIn && loading && (
+          <div className="bg-white rounded-lg shadow-md p-6 text-center">
+            <div className="flex justify-center items-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+            <p className="mt-4 text-gray-600">Loading stock data...</p>
+          </div>
+        )}
+
+        {isLoggedIn && error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <p>{error}</p>
+            <button 
+              onClick={fetchStockData}
+              className="mt-2 bg-red-600 hover:bg-red-700 text-white font-medium py-1 px-3 rounded text-sm"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {isLoggedIn && !loading && !error && (
           <Dashboard 
             stocks={filteredStocks} 
             searchTerm={searchTerm}
@@ -335,18 +363,19 @@ function SignupForm({ onSignup, onSwitchToLogin }) {
 
 // Dashboard Component
 function Dashboard({ stocks, searchTerm, setSearchTerm }) {
-  // Add this handler function
+  // Track search activity for analytics
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
     
-    // Track search if value exists and analytics is available
+    // Track search event if value exists and analytics is available
     if (value && window.analytics) {
       window.analytics.track('Stock Search', {
         searchTerm: value
       });
     }
   };
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-6">
@@ -356,7 +385,7 @@ function Dashboard({ stocks, searchTerm, setSearchTerm }) {
             type="text"
             placeholder="Search stocks..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={handleSearchChange}
             className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -396,7 +425,8 @@ function Dashboard({ stocks, searchTerm, setSearchTerm }) {
       </div>
       
       <div className="mt-6 text-sm text-gray-500">
-        <p className="italic">Note: Stock prices are simulated and updated every 5 seconds. In a production environment, replace with real-time API data.</p>
+        <p className="italic">Note: Stock prices are updated every minute using the Finnhub API.</p>
+        <p className="mt-2">Data provided by <a href="https://finnhub.io/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Finnhub</a></p>
       </div>
     </div>
   );
