@@ -1,4 +1,6 @@
+// App.js - Using CSS classes instead of inline styles
 import { useState, useEffect } from 'react';
+import './styles.css'; // Import the CSS file
 
 // Stock symbols we want to track
 const stockSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA'];
@@ -18,14 +20,13 @@ const companyNames = {
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
-  const [activeView, setActiveView] = useState('login');
   const [stocks, setStocks] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
   // Finnhub API Key - replace with your own
-  const apiKey = 'd0efsjhr01qkbclb48o0d0efsjhr01qkbclb48og';
+  const apiKey = 'YOUR_FINNHUB_API_KEY';
 
   // Filter stocks based on search term
   const filteredStocks = stocks.filter(stock => 
@@ -120,54 +121,70 @@ export default function App() {
     if (username && password) {
       setUser({ username });
       setIsLoggedIn(true);
-      setActiveView('dashboard');
+      
+      // Track login event if analytics exists
+      if (window.analytics) {
+        window.analytics.identify(username, {
+          username: username,
+          loginTime: new Date().toISOString()
+        });
+        
+        window.analytics.track('User Logged In', {
+          method: 'username/password'
+        });
+      }
     }
   };
 
   // Handle logout
   const handleLogout = () => {
+    // Track logout event if analytics exists
+    if (window.analytics) {
+      window.analytics.track('User Logged Out');
+    }
+    
     setUser(null);
     setIsLoggedIn(false);
-    setActiveView('login');
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Header 
-        isLoggedIn={isLoggedIn} 
-        username={user?.username} 
-        onLogout={handleLogout} 
-      />
+    <div>
+      <header>
+        <div className="header-container">
+          <h1 className="site-title">StockInfo</h1>
+          
+          {isLoggedIn && (
+            <div className="user-info">
+              <span>Welcome, {user?.username}</span>
+              <button 
+                onClick={handleLogout}
+                className="logout-button"
+              >
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
       
-      <main className="container mx-auto px-4 py-8">
-        {activeView === 'login' && !isLoggedIn && (
+      <main>
+        {!isLoggedIn && (
           <LoginForm onLogin={handleLogin} />
         )}
 
-        {activeView === 'signup' && !isLoggedIn && (
-          <SignupForm 
-            onSignup={(username, password) => {
-              handleLogin(username, password);
-            }}
-            onSwitchToLogin={() => setActiveView('login')}
-          />
-        )}
-
         {isLoggedIn && loading && (
-          <div className="bg-white rounded-lg shadow-md p-6 text-center">
-            <div className="flex justify-center items-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            </div>
-            <p className="mt-4 text-gray-600">Loading stock data...</p>
+          <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p className="loading-text">Loading stock data...</p>
           </div>
         )}
 
         {isLoggedIn && error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="error-container">
             <p>{error}</p>
             <button 
               onClick={fetchStockData}
-              className="mt-2 bg-red-600 hover:bg-red-700 text-white font-medium py-1 px-3 rounded text-sm"
+              className="retry-button"
             >
               Retry
             </button>
@@ -183,33 +200,11 @@ export default function App() {
         )}
       </main>
       
-      <Footer />
+      <footer>
+        <p className="footer-text">© {new Date().getFullYear()} StockInfo. This is a demo application.</p>
+        <p className="footer-subtext">Stock data provided by Finnhub</p>
+      </footer>
     </div>
-  );
-}
-
-// Header Component
-function Header({ isLoggedIn, username, onLogout }) {
-  return (
-    <header className="bg-blue-600 text-white shadow-md">
-      <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-        <div className="flex items-center">
-          <h1 className="text-2xl font-bold">StockInfo</h1>
-        </div>
-        
-        {isLoggedIn && (
-          <div className="flex items-center space-x-4">
-            <span>Welcome, {username}</span>
-            <button 
-              onClick={onLogout}
-              className="bg-blue-700 hover:bg-blue-800 px-3 py-1 rounded text-sm"
-            >
-              Logout
-            </button>
-          </div>
-        )}
-      </div>
-    </header>
   );
 }
 
@@ -230,133 +225,48 @@ function LoginForm({ onLogin }) {
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold mb-4 text-center">Login to StockInfo</h2>
+    <div className="login-container">
+      <h2 className="login-title">Stock Info</h2>
+      <h3 className="login-subtitle">Sign in to your account</h3>
       
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-4">
+        <div className="error-message">
           {error}
         </div>
       )}
       
-      <div>
-        <div className="mb-4">
-          <label htmlFor="username" className="block text-gray-700 mb-1">Username</label>
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label htmlFor="username">Username</label>
           <input
             type="text"
             id="username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         
-        <div className="mb-6">
-          <label htmlFor="password" className="block text-gray-700 mb-1">Password</label>
+        <div className="form-group">
+          <label htmlFor="password">Password</label>
           <input
             type="password"
             id="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         
         <button
-          onClick={handleSubmit}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded"
+          type="submit"
+          className="submit-button"
         >
           Login
         </button>
-      </div>
+      </form>
       
-      <p className="mt-4 text-center text-gray-600">
-        Don't have an account? Use any username/password for demo.
+      <p className="login-message">
+        Demo app - Use any username/password to login
       </p>
-    </div>
-  );
-}
-
-// Signup Form Component
-function SignupForm({ onSignup, onSwitchToLogin }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!username || !password || !confirmPassword) {
-      setError('Please fill in all fields.');
-      return;
-    }
-    
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-    
-    onSignup(username, password);
-  };
-
-  return (
-    <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold mb-4 text-center">Create an Account</h2>
-      
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-4">
-          {error}
-        </div>
-      )}
-      
-      <div>
-        <div className="mb-4">
-          <label htmlFor="username" className="block text-gray-700 mb-1">Username</label>
-          <input
-            type="text"
-            id="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        
-        <div className="mb-4">
-          <label htmlFor="password" className="block text-gray-700 mb-1">Password</label>
-          <input
-            type="password"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        
-        <div className="mb-6">
-          <label htmlFor="confirmPassword" className="block text-gray-700 mb-1">Confirm Password</label>
-          <input
-            type="password"
-            id="confirmPassword"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        
-        <button
-          onClick={handleSubmit}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded"
-        >
-          Sign Up
-        </button>
-        
-        <button
-          onClick={onSwitchToLogin}
-          className="w-full mt-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded"
-        >
-          Back to Login
-        </button>
-      </div>
     </div>
   );
 }
@@ -377,45 +287,60 @@ function Dashboard({ stocks, searchTerm, setSearchTerm }) {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Stock Dashboard</h2>
-        <div className="w-1/3">
+    <div className="dashboard">
+      <div className="dashboard-header">
+        <h2 className="dashboard-title">Stock Dashboard</h2>
+        <div className="search-container">
           <input
-            type="text"
+            type="search"
             placeholder="Search stocks..."
             value={searchTerm}
             onChange={handleSearchChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="search-input"
           />
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            className="search-icon" 
+            width="20" 
+            height="20" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
         </div>
       </div>
       
-      <div className="overflow-x-auto">
-        <table className="min-w-full bg-white">
+      <div>
+        <table className="stock-table">
           <thead>
-            <tr className="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
-              <th className="py-3 px-6 text-left">Symbol</th>
-              <th className="py-3 px-6 text-left">Company</th>
-              <th className="py-3 px-6 text-right">Price (USD)</th>
-              <th className="py-3 px-6 text-right">Change</th>
+            <tr>
+              <th>Symbol</th>
+              <th>Company</th>
+              <th>Price (USD)</th>
+              <th>Change</th>
             </tr>
           </thead>
-          <tbody className="text-gray-600 text-sm">
+          <tbody>
             {stocks.length > 0 ? (
               stocks.map((stock) => (
-                <tr key={stock.symbol} className="border-b border-gray-200 hover:bg-gray-50">
-                  <td className="py-3 px-6 text-left font-medium">{stock.symbol}</td>
-                  <td className="py-3 px-6 text-left">{stock.name}</td>
-                  <td className="py-3 px-6 text-right">${stock.price.toFixed(2)}</td>
-                  <td className={`py-3 px-6 text-right ${stock.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <tr key={stock.symbol}>
+                  <td className="symbol-cell">{stock.symbol}</td>
+                  <td>{stock.name}</td>
+                  <td className="price-cell">${stock.price.toFixed(2)}</td>
+                  <td className={`change-cell ${stock.change >= 0 ? 'positive-change' : 'negative-change'}`}>
                     {stock.change >= 0 ? '+' : ''}{parseFloat(stock.change).toFixed(2)}
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="4" className="py-6 text-center text-gray-500">
+                <td colSpan="4" className="empty-table-message">
                   No stocks found matching your search.
                 </td>
               </tr>
@@ -424,23 +349,10 @@ function Dashboard({ stocks, searchTerm, setSearchTerm }) {
         </table>
       </div>
       
-      <div className="mt-6 text-sm text-gray-500">
-        <p className="italic">Note: Stock prices are updated every minute using the Finnhub API.</p>
-        <p className="mt-2">Data provided by <a href="https://finnhub.io/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Finnhub</a></p>
+      <div>
+        <p className="data-note">Note: Stock prices are updated every minute using the Finnhub API.</p>
+        <p className="data-source">Data provided by <a href="https://finnhub.io/" target="_blank" rel="noopener noreferrer">Finnhub</a></p>
       </div>
     </div>
-  );
-}
-
-// Footer Component
-function Footer() {
-  return (
-    <footer className="bg-gray-800 text-white py-4 mt-8">
-      <div className="container mx-auto px-4 text-center">
-        <p className="text-sm">
-          © {new Date().getFullYear()} StockInfo. This is a demo application.
-        </p>
-      </div>
-    </footer>
   );
 }
