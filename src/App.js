@@ -3,27 +3,31 @@ import { useState, useEffect } from 'react';
 import './styles.css'; // Import the CSS file
 
 // Stock symbols we want to track
-const stockSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA'];
+const stockSymbols = ['LMND', 'TMDX', 'GOOGL', 'AMZN', 'TSLA', 'ABNB', 'NVDA','HIMS','TTD'];
 
 // Company names mapping (since the API doesn't return company names)
 const companyNames = {
-  'AAPL': 'Apple Inc.',
-  'MSFT': 'Microsoft Corporation',
+  'LMND': 'Lemonade',
+  'TMDX': 'Transmedics',
   'GOOGL': 'Alphabet Inc.',
   'AMZN': 'Amazon.com Inc.',
   'TSLA': 'Tesla, Inc.',
-  'META': 'Meta Platforms, Inc.',
-  'NVDA': 'NVIDIA Corporation'
+  'ABNB': 'AirBNB',
+  'NVDA': 'NVIDIA Corporation',
+  'HIMS': 'Hims & Hers',
+  'TTD': 'The Trade Desk'
 };
 
 // Main App Component
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isGuestMode, setIsGuestMode] = useState(false);
   const [user, setUser] = useState(null);
   const [stocks, setStocks] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
   
   // Finnhub API Key - replace with your own
   const apiKey = 'd0efsjhr01qkbclb48o0d0efsjhr01qkbclb48og';
@@ -35,75 +39,115 @@ export default function App() {
   );
 
   // Function to fetch real stock data from Finnhub
-  const fetchStockData = async () => {
-    setLoading(true);
-    setError('');
+// Function to fetch real stock data from Finnhub
+const fetchStockData = async () => {
+  setLoading(true);
+  setError('');
+  
+  
+  
+  
+  try {
+    // Create an array to hold our stock data
+    const stockData = [];
     
-    try {
-      // Create an array to hold our stock data
-      const stockData = [];
-      
-      // Fetch data for each stock using Finnhub's Quote endpoint
-      const fetchPromises = stockSymbols.map(async (symbol) => {
-        try {
-          const response = await fetch(
-            `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`
-          );
-          
-          if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          
-          // Check if we got valid data
-          if (data && data.c) {
-            stockData.push({
-              symbol,
-              name: companyNames[symbol],
-              price: data.c,
-              change: data.d
-            });
-          } else {
-            console.warn(`No data available for ${symbol}`);
-            // Add fallback data if API doesn't return valid data
-            stockData.push({
-              symbol,
-              name: companyNames[symbol],
-              price: Math.random() * 500 + 100, // Random price between 100-600
-              change: (Math.random() - 0.5) * 10 // Random change between -5 and 5
-            });
-          }
-        } catch (err) {
-          console.error(`Error fetching data for ${symbol}:`, err);
-          // Add fallback data if API request fails
+    // Fetch data for each stock using Finnhub's Quote endpoint
+    const fetchPromises = stockSymbols.map(async (symbol) => {
+      try {
+        // Fetch quote data
+        const quoteResponse = await fetch(
+          `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`
+        );
+        
+        if (!quoteResponse.ok) {
+          throw new Error(`HTTP error! Status: ${quoteResponse.status}`);
+        }
+        
+        const quoteData = await quoteResponse.json();
+
+        
+
+
+        
+        // Fetch company metrics for P/E, P/S and Market Cap
+        const metricsResponse = await fetch(
+          `https://finnhub.io/api/v1/stock/metric?symbol=${symbol}&metric=all&token=${apiKey}`
+        );
+        
+        let marketCap = null;
+        let peRatio = null;
+        let psRatio = null;
+        
+        if (metricsResponse.ok) {
+          const metricsData = await metricsResponse.json();
+     
+          marketCap = metricsData.metric?.marketCapitalization;
+          peRatio = metricsData.metric?.peTTM;
+          psRatio = metricsData.metric?.ps;
+        }
+
+  
+        
+        // Check if we got valid data
+        if (quoteData && quoteData.c) {
           stockData.push({
             symbol,
             name: companyNames[symbol],
-            price: Math.random() * 500 + 100,
-            change: (Math.random() - 0.5) * 10
+            price: quoteData.c,
+            change: quoteData.d,
+            marketCap: marketCap || Math.random() * 1000, // Fallback to random
+            peRatio: peRatio || (Math.random() * 50 + 10), // Fallback to random
+            psRatio: psRatio || (Math.random() * 20 + 1) // Fallback to random
+          });
+        } else {
+          console.warn(`No data available for ${symbol}`);
+          // Add fallback data if API doesn't return valid data
+          stockData.push({
+            symbol,
+            name: companyNames[symbol],
+            price: Math.random() * 500 + 100, // Random price between 100-600
+            change: (Math.random() - 0.5) * 10, // Random change between -5 and 5
+            marketCap: Math.random() * 1000, // Random market cap in billions
+            peRatio: Math.random() * 50 + 10, // Random P/E between 10-60
+            psRatio: Math.random() * 20 + 1 // Random P/S between 1-21
           });
         }
-      });
+      } catch (err) {
+        console.error(`Error fetching data for ${symbol}:`, err);
+        // Add fallback data if API request fails
+        stockData.push({
+          symbol,
+          name: companyNames[symbol],
+          price: Math.random() * 500 + 100,
+          change: (Math.random() - 0.5) * 10,
+          marketCap: Math.random() * 1000,
+          peRatio: Math.random() * 50 + 10,
+          psRatio: Math.random() * 20 + 1
+        });
+        
+      }
       
-      // Wait for all API calls to complete
-      await Promise.all(fetchPromises);
-      
-      // Sort the stock data by symbol to maintain consistent order
-      stockData.sort((a, b) => a.symbol.localeCompare(b.symbol));
-      
-      setStocks(stockData);
-    } catch (err) {
-      console.error('Error fetching stock data:', err);
-      setError('Failed to fetch stock data. Please try again later.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    });
+    
+    // Wait for all API calls to complete
+    await Promise.all(fetchPromises);
+    
+    // Sort the stock data by symbol to maintain consistent order
+    stockData.sort((a, b) => a.symbol.localeCompare(b.symbol));
+    
+    setStocks(stockData);
+  } catch (err) {
+    console.error('Error fetching stock data:', err);
+    setError('Failed to fetch stock data. Please try again later.');
+  } finally {
+    setLoading(false);
+  }
+};
 
-  // Fetch real stock data when logged in
+  // Fetch real stock data when logged in or in guest mode 
   useEffect(() => {
-    if (isLoggedIn) {
+   
+    if (isLoggedIn || isGuestMode) {
       fetchStockData();
       
       // Refresh stock data every 60 seconds
@@ -113,7 +157,7 @@ export default function App() {
       
       return () => clearInterval(interval);
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, isGuestMode]);
 
   // Handle login logic
   const handleLogin = (username, password) => {
@@ -145,7 +189,19 @@ export default function App() {
     
     setUser(null);
     setIsLoggedIn(false);
+    setIsGuestMode(false);
   };
+  const handleGuestAccess = () => {
+   
+    setIsGuestMode(true);
+    fetchStockData(); // Fetch stock data immediately
+    
+    // Optional: Track guest access event if analytics exists
+    if (window.analytics) {
+      window.analytics.track('Guest Access');
+    }
+  };
+
 
   return (
     <div>
@@ -168,9 +224,12 @@ export default function App() {
       </header>
       
       <main>
-        {!isLoggedIn && (
-          <LoginForm onLogin={handleLogin} />
-        )}
+      {!isLoggedIn && !isGuestMode && (
+  <LoginForm 
+    onLogin={handleLogin} 
+    onGuestAccess={handleGuestAccess} // Pass the function here
+  />
+)}
 
         {isLoggedIn && loading && (
           <div className="loading-container">
@@ -191,7 +250,7 @@ export default function App() {
           </div>
         )}
 
-        {isLoggedIn && !loading && !error && (
+        {(isLoggedIn || isGuestMode) && !loading && !error && (
           <Dashboard 
             stocks={filteredStocks} 
             searchTerm={searchTerm}
@@ -209,10 +268,12 @@ export default function App() {
 }
 
 // Login Form Component
-function LoginForm({ onLogin }) {
+function LoginForm({ onLogin, onGuestAccess }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+
+  
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -263,6 +324,16 @@ function LoginForm({ onLogin }) {
           Login
         </button>
       </form>
+
+      <div className="guest-access">
+        <p>Or</p>
+        <button 
+          onClick={onGuestAccess}
+          className="guest-button"
+        >
+          Continue as Guest
+        </button>
+      </div>
       
       <p className="login-message">
         Demo app - Use any username/password to login
@@ -317,36 +388,55 @@ function Dashboard({ stocks, searchTerm, setSearchTerm }) {
       </div>
       
       <div>
-        <table className="stock-table">
-          <thead>
-            <tr>
-              <th>Symbol</th>
-              <th>Company</th>
-              <th>Price (USD)</th>
-              <th>Change</th>
-            </tr>
-          </thead>
-          <tbody>
-            {stocks.length > 0 ? (
-              stocks.map((stock) => (
-                <tr key={stock.symbol}>
-                  <td className="symbol-cell">{stock.symbol}</td>
-                  <td>{stock.name}</td>
-                  <td className="price-cell">${stock.price.toFixed(2)}</td>
-                  <td className={`change-cell ${stock.change >= 0 ? 'positive-change' : 'negative-change'}`}>
-                    {stock.change >= 0 ? '+' : ''}{parseFloat(stock.change).toFixed(2)}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="4" className="empty-table-message">
-                  No stocks found matching your search.
+      <table className="stock-table">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Company</th>
+            <th>Price (USD)</th>
+            <th>Change</th>
+            <th>Market Cap (B)</th>
+            <th>P/E</th>
+            <th>P/S</th>
+          </tr>
+        </thead>
+        <tbody>
+          {stocks.length > 0 ? (
+            stocks.map((stock) => (
+              <tr key={stock.symbol}>
+                <td className="symbol-cell">{stock.symbol}</td>
+                <td>{stock.name}</td>
+                <td className="price-cell">
+                  ${stock.price.toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}
+                </td>
+                <td className={`change-cell ${stock.change >= 0 ? 'positive-change' : 'negative-change'}`}>
+                  {stock.change >= 0 ? '+' : ''}{parseFloat(stock.change).toFixed(2)}
+                </td>
+                <td className="metric-cell">
+                  ${stock.marketCap.toLocaleString('en-US', { 
+                    maximumFractionDigits: 2 
+                  })}B
+                </td>
+                <td className="metric-cell">
+                  {stock.peRatio ? stock.peRatio.toFixed(2) : 'N/A'}
+                </td>
+                <td className="metric-cell">
+                  {stock.psRatio ? stock.psRatio.toFixed(2) : 'N/A'}
                 </td>
               </tr>
-            )}
-          </tbody>
-        </table>
+            ))
+          ) : (
+            <tr>
+              <td colSpan="7" className="empty-table-message"> {/* Updated colspan from 4 to 7 */}
+                No stocks found matching your search.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
       </div>
       
       <div>
