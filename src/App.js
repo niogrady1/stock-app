@@ -26,7 +26,7 @@ export default function App() {
   const [error, setError] = useState('');
   
   // Finnhub API Key - replace with your own
-  const apiKey = 'YOUR_FINNHUB_API_KEY';
+  const apiKey = 'd0efsjhr01qkbclb48o0d0efsjhr01qkbclb48og';
 
   // Filter stocks based on search term
   const filteredStocks = stocks.filter(stock => 
