@@ -342,17 +342,23 @@ function LoginForm({ onLogin, onGuestAccess }) {
   );
 }
 
-// Dashboard Component
+// In the Dashboard component, modify the search handling to track only on form submission
 function Dashboard({ stocks, searchTerm, setSearchTerm }) {
-  // Track search activity for analytics
+  // Track search activity only when form is submitted
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
+    // Remove the analytics tracking from here
+  };
+
+  // New function to handle search submission
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
     
-    // Track search event if value exists and analytics is available
-    if (value && window.analytics) {
+    // Only track the search event when the form is submitted and value exists
+    if (searchTerm && window.analytics) {
       window.analytics.track('Stock Search', {
-        searchTerm: value
+        searchTerm: searchTerm
       });
     }
   };
@@ -361,7 +367,7 @@ function Dashboard({ stocks, searchTerm, setSearchTerm }) {
     <div className="dashboard">
       <div className="dashboard-header">
         <h2 className="dashboard-title">Stock Dashboard</h2>
-        <div className="search-container">
+        <form onSubmit={handleSearchSubmit} className="search-container">
           <input
             type="search"
             placeholder="Search stocks..."
@@ -369,26 +375,30 @@ function Dashboard({ stocks, searchTerm, setSearchTerm }) {
             onChange={handleSearchChange}
             className="search-input"
           />
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            className="search-icon" 
-            width="20" 
-            height="20" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          >
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-        </div>
+          <button type="submit" className="search-button">
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              className="search-icon" 
+              width="20" 
+              height="20" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </button>
+        </form>
       </div>
       
+      {/* Rest of your component remains the same */}
       <div>
       <table className="stock-table">
+        {/* Table content unchanged */}
         <thead>
           <tr>
             <th>Symbol</th>
@@ -430,7 +440,7 @@ function Dashboard({ stocks, searchTerm, setSearchTerm }) {
             ))
           ) : (
             <tr>
-              <td colSpan="7" className="empty-table-message"> {/* Updated colspan from 4 to 7 */}
+              <td colSpan="7" className="empty-table-message">
                 No stocks found matching your search.
               </td>
             </tr>
